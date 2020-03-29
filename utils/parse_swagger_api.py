@@ -62,6 +62,7 @@ class ParseJson:
         write_data(self.http_suite, testsuite_json_path)
         print(self.tags_list)
         for tag in self.tags_list:
+            print(tag)
             self.http_case = {"config": {"name": "", "base_url": "", "variables": {}}, "teststeps": []}
 
             for key, value in res['paths'].items():
@@ -82,16 +83,16 @@ class ParseJson:
     def parse_params(self, params, api, method, tag):
         # 定义接口数据格式
         http_interface = {"name": "", "variables": {},
-                          "request": {"url": "", "method": "", "headers": {}, "json": {}, "params": {}}, "validate": [],
-                          "output": []}
+                          "request": {"api": "", "method": "", "headers": {}, "json": {}, "params": {}}, "validate": [],
+                          "output": {}}
         # 测试用例的数据格式:
-        http_api_testcase = {"name": "", "api": "", "variables": {}, "validate": [], "extract": [], "output": []}
+        http_api_testcase = {"name": "", "api": "", "variables": {}, "validate": [], "extract": [], "output": {}}
         name = params['summary'].replace('/', '_')
         http_interface['name'] = name
         http_api_testcase['name'] = name
         http_api_testcase['api'] = 'api/{}/{}.json'.format(tag, name)
         http_interface['request']['method'] = method.upper()
-        http_interface['request']['url'] = api.replace('{', '$').replace('}', '')
+        http_interface['request']['api'] = api.replace('{', '$').replace('}', '')
         parameters = params.get('parameters')  # 未解析的参数字典
         responses = params.get('responses')
         if not parameters:  # 确保参数字典存在
@@ -108,7 +109,7 @@ class ParseJson:
                             if 'example' in value.keys():
                                 http_interface['request']['json'].update({key: value['example']})
                             else:
-                                http_interface['request']['json'].update({key: ''})
+                                http_interface['request']['json'].update({key: value.get('type')})
 
             elif each.get('in') == 'query':
                 name = each.get('name')
@@ -137,14 +138,22 @@ class ParseJson:
                     res = self.definitions[param_key]['properties']
                     i = 0
                     for k, v in res.items():
-                        if 'example' in v.keys():
-                            http_interface['validate'].append({"eq": []})
-                            http_interface['validate'][i]['eq'].append('content.' + k)
-                            http_interface['validate'][i]['eq'].append(v['example'])
-                            http_api_testcase['validate'].append({"eq": []})
-                            http_api_testcase['validate'][i]['eq'].append('content.' + k)
-                            http_api_testcase['validate'][i]['eq'].append(v['example'])
-                            i += 1
+                        # if 'example' in v.keys():
+                        #     http_interface['validate'].append({"eq": []})
+                        #     http_interface['validate'][i]['eq'].append('content.' + k)
+                        #     http_interface['validate'][i]['eq'].append(v['example'])
+                        #     http_api_testcase['validate'].append({"eq": []})
+                        #     http_api_testcase['validate'][i]['eq'].append('content.' + k)
+                        #     http_api_testcase['validate'][i]['eq'].append(v['example'])
+                        #     i += 1
+                        http_interface['output'].update({k: v.get('type')})
+                        # if k == 'data':
+                        #     http_interface['output'].update({'data': {}})
+                        #     param_key_2 = str(v).split('/')[-1].replace('"', '').replace('}', '').replace("'", '')
+                        #     res_2 = self.definitions[param_key_2]['properties']
+                        #     for key,value in res_2.items():
+                        #         http_interface['output']['data'].update({key: value.get('type')})
+
                 else:
                     if len(http_interface['validate']) != 1:
                         http_interface['validate'].append({"eq": []})
@@ -160,7 +169,8 @@ class ParseJson:
             del http_interface['request']['params']
 
             # 定义接口测试用例
-        tags_path = os.path.join(api_path, tag).replace("/", "_")
+        tags_path = os.path.join(api_path, tag.replace("-", "_")).replace("/", "_")
+        # tags_path = os.path.join(api_path, tag).replace("/", "_")
 
         # 创建不存在的文件目录
         if not os.path.exists(api_path):
